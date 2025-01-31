@@ -1,8 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import '../widgets/todo_item.dart';
 import '../model/todo.dart';
 
-void main() {
+
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 
@@ -59,35 +64,52 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
 
-  final todoList = ToDo.todoList();
-
-  void _handleToDoChange(ToDo todo) {
+  void _handleToDoChange(ToDo todo, DocumentSnapshot document) {
     setState(() {
       todo.isDone = !todo.isDone;
+      document.reference.update({
+        "IsDone" : todo.isDone
+      });
     });
   }
 
-  void _handleToDoEdited(ToDo todo, TextEditingController controller) {
+  void _handleToDoEdited(ToDo todo, String text, DocumentSnapshot document) {
     setState(() {
-      todo.todoText = controller.text;
+      todo.todoText = text;
+      document.reference.update({
+        "Task" : todo.todoText
+      });
     });
   }
 
-  void _deleteToDoItem(String id) {
+  void _deleteToDoItem(String id, DocumentSnapshot document) {
     setState(() {
-      todoList.removeWhere((item) => item.id == id);
+      document.reference.delete();
     });
   }
 
   void _addToDoItem() {
-    setState(() {
-      todoList.add(ToDo(
-        id: DateTime.now().millisecond.toString(),
-        todoText: null,
-        isDone: false,
-      ));
+    setState(() { 
+      //TODO: support multiple users
+      CollectionReference collectionRef = FirebaseFirestore.instance.collection('Users').doc("xs1ev91rMr0SmBwXWw9v").collection('ToDos');
+      collectionRef.add({
+        "Id": DateTime.now().millisecond.toString(),
+        "Task": null,
+        "IsDone": false
+      });
     });
   
+  }
+
+  Widget _buildListItem(BuildContext context, DocumentSnapshot document) {
+    var item = ToDo(id: document['Id'], todoText: document['Task'], isDone: document['IsDone']);
+    return ToDoItem(
+      doc: document,
+      todo: item,
+      onToDoChanged: _handleToDoChange,
+      onToDoEdited: _handleToDoEdited,
+      onDeleteItem: _deleteToDoItem,
+    );
   }
 
   @override
@@ -132,35 +154,29 @@ class _MyHomePageState extends State<MyHomePage> {
           //mainAxisAlignment: MainAxisAlignment.start,
           children: [
             Expanded(
-              child: ListView(
-                children: [
+              child: StreamBuilder(
+                stream: FirebaseFirestore.instance.collection('Users').doc("xs1ev91rMr0SmBwXWw9v").collection('ToDos').snapshots(),
+                builder: (context, snapshot){
+                  if (!snapshot.hasData) return const Text('Loading...');
                   
-                  for (ToDo item in todoList)
-                    ToDoItem(
-                      todo: item,
-                      onToDoChanged: _handleToDoChange,
-                      onToDoEdited: _handleToDoEdited,
-                      onDeleteItem: _deleteToDoItem,
-                    ),
-
-                  FloatingActionButton(
-                    onPressed: () {
-                      _addToDoItem();
-                    },
-                    tooltip: 'Add Item',
-                    child: const Icon(Icons.add),
-                  ),
-                ],
-                
+                  //return _buildToDoList(context, snapshot);
+                  return ListView.builder(
+                    itemCount: snapshot.data!.docs.length,
+                    itemBuilder: (context, index) => 
+                        _buildListItem(context, snapshot.data!.docs[index]),
+                  );
+                }  
               ),
-            )
+            ),
+            FloatingActionButton(
+              onPressed: () {
+                _addToDoItem();
+              },
+              tooltip: 'Add Item',
+              child: const Icon(Icons.add),
+            ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
       ),
     );
   }

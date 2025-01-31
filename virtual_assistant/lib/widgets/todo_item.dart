@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../model/todo.dart';
 
 class ToDoItem extends StatefulWidget {
+  final DocumentSnapshot doc;
   final ToDo todo;
   final onToDoChanged;
   final onToDoEdited;
@@ -9,6 +11,7 @@ class ToDoItem extends StatefulWidget {
 
   ToDoItem({
     Key? key, 
+    required this.doc,
     required this.todo, 
     required this.onToDoChanged, 
     required this.onToDoEdited,
@@ -24,6 +27,7 @@ class _ToDoItemState extends State<ToDoItem> {
 
   @override 
   Widget build(BuildContext context) {
+    var textEditController = TextEditingController(text: widget.todo.todoText == null ? '' : widget.todo.todoText!);
     return Container(
       margin: EdgeInsets.only(bottom: 10),
       child: ListTile(
@@ -33,7 +37,7 @@ class _ToDoItemState extends State<ToDoItem> {
             });
           },
           onTap: () {
-            widget.onToDoChanged(widget.todo);
+            widget.onToDoChanged(widget.todo, widget.doc);
           },
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10
@@ -48,17 +52,19 @@ class _ToDoItemState extends State<ToDoItem> {
           title: Container(
             child: (_isEditMode || widget.todo.todoText == null) ?
               TextFormField(
+                controller: textEditController,
                 autofocus: true,
                 onTapOutside: ((event) {
                   _isEditMode = false;
                   FocusScope.of(context).unfocus();
+                  widget.onToDoEdited(widget.todo, textEditController.text, widget.doc);
                 }),
                 onFieldSubmitted: (value) {
                   widget.todo.todoText = value;
                   _isEditMode = false;
                   FocusScope.of(context).unfocus();
+                  widget.onToDoEdited(widget.todo, textEditController.text, widget.doc);
                 },
-                initialValue: widget.todo.todoText == null ? '' : widget.todo.todoText!,
                 decoration: InputDecoration(
                   border: InputBorder.none,
                 ),
@@ -72,7 +78,7 @@ class _ToDoItemState extends State<ToDoItem> {
           ),
           trailing: IconButton(
             onPressed: () {
-              widget.onDeleteItem(widget.todo.id);
+              widget.onDeleteItem(widget.todo.id, widget.doc);
             },
             icon: Icon(Icons.close),
           )
